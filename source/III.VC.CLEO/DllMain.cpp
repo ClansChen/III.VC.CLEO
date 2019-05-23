@@ -1,4 +1,4 @@
-#include <Windows.h>
+﻿#include <Windows.h>
 #include "Game.h"
 #include "CPatch.h"
 #include "Log.h"
@@ -37,7 +37,7 @@ std::vector<char>	aScriptTextures;
 std::vector<char>	aTextSprites;
 std::vector<char>	aTextDrawers;
 
-#if CLEO_VC
+#ifdef CLEO_VC
 void PatchArrays()
 {
 	aScriptTextures.resize(4 * 121);
@@ -134,7 +134,7 @@ void PatchArrays()
 	injector::WriteMemory<char>(0x450AF9 + 2, 121, true);
 	injector::WriteMemory<char>(0x4501F3 + 3, 121, true);
 }
-#else
+#elif defined CLEO_III
 void PatchArrays()
 {
 	aScriptTextures.resize(4 * 125);
@@ -407,7 +407,7 @@ BOOL __stdcall DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	if(fdwReason == DLL_PROCESS_ATTACH)
 	{
 		Log::Initialise("cleo.log");
-#if CLEO_VC
+#ifdef CLEO_VC
 		LOGL(LOG_PRIORITY_ALWAYS, "GTA VC CLEO v%d.%d.%d.%d Log File", CLEO_VERSION_MAIN, CLEO_VERSION_MAJOR, 
 			CLEO_VERSION_MINOR, CLEO_VERSION_BINARY);
 
@@ -436,7 +436,7 @@ BOOL __stdcall DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			LOGL(LOG_PRIORITY_GAME_EVENT, "GTA VC unknown version");
 			break;
 		}
-#else
+#elif defined CLEO_III
 		LOGL(LOG_PRIORITY_ALWAYS, "GTA 3 CLEO v%d.%d.%d.%d Log File", CLEO_VERSION_MAIN, CLEO_VERSION_MAJOR,
 			CLEO_VERSION_MINOR, CLEO_VERSION_BINARY);
 
@@ -474,7 +474,7 @@ BOOL __stdcall DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 #endif
 		if (game.GetGameVersion() == GAME_VSTEAMENC)
 		{
-#if CLEO_VC
+#ifdef CLEO_VC
 			CreateThread(0, 0, (LPTHREAD_START_ROUTINE)&SteamHandlerDllMain, NULL, 0, NULL);
 #endif
 		}

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CustomScript.h"
 #include <list>
@@ -6,37 +6,41 @@
 class ScriptManager
 {
 public:
-	CScript gameScripts[128];
+    CCustomScript gameScripts[128];
 
-	std::list<char *> scriptMemory;
+    std::list<char *> scriptMemory;
 
-	CScript *pCusomScripts;
+    CCustomScript *pCustomScripts;
 
-	unsigned int numLoadedCustomScripts;
+    unsigned int numLoadedCustomScripts;
 
-	ScriptManager();
+    ScriptManager();
 
-	char *AllocateMemoryForScript(char *scriptName, unsigned int size);
+    CCustomScript *FindScriptByName(const char *name);
 
-	void DeleteScriptMemory(char *scriptName, char *data);
+    void TerminateScriptByName(const char *name);
 
-	void ReleaseScriptsMemory();
+    char *AllocateMemoryForScript(const char *scriptName, unsigned int size);
 
-	void LoadScripts();
+    void DeleteScriptMemory(const char *scriptName, char *data);
 
-	void UnloadScripts();
+    void ReleaseScriptsMemory();
 
-	void DisableAllScripts();
+    void LoadScripts();
 
-	void EnableAllScripts();
+    void UnloadScripts();
 
-	static void __fastcall InitialiseScript(CScript *script);
+    void DisableAllScripts();
 
-	static eOpcodeResult __fastcall ProcessScriptCommand(CScript *script);
+    void EnableAllScripts();
 
-	static void __fastcall CollectScriptParameters(CScript *script, int, unsigned int *pIp, unsigned int numParams);
+    static void __fastcall InitialiseScript(CCustomScript *script);
 
-	static int __fastcall CollectScriptNextParameterWithoutIncreasingPC(CScript *script, int, unsigned int ip);
+    static eOpcodeResult __fastcall ProcessScriptCommand(CCustomScript *script);
+
+    static void __fastcall CollectScriptParameters(CCustomScript *script, int, unsigned int *pIp, unsigned int numParams);
+
+    static tScriptVar __fastcall CollectScriptNextParameterWithoutIncreasingPC(CCustomScript *script, int, unsigned int ip);
 };
 
 extern ScriptManager scriptMgr;
