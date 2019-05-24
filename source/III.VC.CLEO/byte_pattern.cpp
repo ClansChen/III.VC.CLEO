@@ -6,6 +6,8 @@
 using namespace std;
 using namespace std::chrono;
 
+#pragma warning(disable:4996)
+
 memory_pointer byte_pattern::get(size_t index) const
 {
     return this->_results.at(index);
@@ -55,6 +57,7 @@ byte_pattern &byte_pattern::set_pattern(const void *pattern_binary, size_t size)
     this->_pattern.clear();
     this->_mask.clear();
     this->_pattern.assign(reinterpret_cast<const uint8_t *>(pattern_binary), reinterpret_cast<const uint8_t *>(pattern_binary) + size);
+    this->_literal = make_bytes_literal(pattern_binary, size);
     this->_mask.resize(size, 0xFF);
     this->bm_preprocess();
 
@@ -332,27 +335,45 @@ void byte_pattern::bm_search()
     _spent = dur.count();
 }
 
+std::string byte_pattern::make_bytes_literal(memory_pointer pointer, std::size_t length)
+{
+    std::string result;
+
+    for (size_t i = 0; i < length; i++)
+    {
+        char buffer[10];
+
+        sprintf(buffer, "%X", (int)*pointer.p<uint8_t>(i));
+        result += buffer;
+        result += ' ';
+    }
+
+    return result;
+}
+
 void byte_pattern::debug_output() const
 {
+    //Spent *costed time*ms. Result(s) of pattern: *pattern literal*
+    //0xFFFFFFFF *Actual bytes*
     if (!log_stream().is_open())
         return;
 
     log_stream() << hex << uppercase << fixed;
 
-    log_stream() << _spent << u8"ms. Result(s) of pattern: " << _literal << endl;
+    log_stream() << "Result(s) of pattern in " << _spent << "ms: " << _literal << '\n';
 
     if (count() > 0)
     {
         for_each_result(
-            [](memory_pointer pointer)
+            [this](memory_pointer pointer)
         {
-            log_stream() << "0x" << pointer.i() << endl;
+            log_stream() << "0x" << pointer.i() << " | " << make_bytes_literal(pointer, _pattern.size()) << '\n';
         });
     }
     else
     {
-        log_stream() << "None" << endl;
+        log_stream() << "None\n";
     }
 
-    log_stream() << endl;
+    log_stream() << flush;
 }

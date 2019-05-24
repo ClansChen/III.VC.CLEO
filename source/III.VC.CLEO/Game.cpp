@@ -5,7 +5,6 @@
 #include "Fxt.h"
 #include "CleoVersion.h"
 #include "CleoPlugins.h"
-#include "byte_pattern.h"
 
 GtaGame game;
 
@@ -84,21 +83,6 @@ void GtaGame::InitialiseGameVersion()
 eGameVersion GtaGame::GetGameVersion()
 {
     return this->Version;
-}
-
-void GtaGame::PatchLocalVars()
-{
-#ifdef  CLEO_VC
-    byte_pattern pat;
-
-    //patch local var offsets;
-
-    //patch save/load for 0@-17@
-
-    //patch 16@ 17@ specially
-#elif defined CLEO_III
-
-#endif
 }
 
 void GtaGame::InitAndPatch()
@@ -732,6 +716,13 @@ void GtaGame::InitScripts_OnGameSaveLoad()
     scriptMgr.UnloadScripts();
     CustomText::Unload();
     game.Events.pfInitScripts_OnGameSaveLoad();
+
+    std::for_each(std::begin(scriptMgr.gameScripts), std::end(scriptMgr.gameScripts),
+        [](CCustomScript &script)
+    {
+        std::copy_n(script.m_aLVarsForSave, 18, script.m_aLargeLVars);
+    });
+
     scriptMgr.LoadScripts();
     CustomText::Load();
     std::for_each(game.Misc.openedFiles->begin(), game.Misc.openedFiles->end(), fclose);
@@ -755,6 +746,13 @@ void GtaGame::OnShutdownGame()
 void GtaGame::OnGameSaveScripts(int a, int b)
 {
     LOGL(LOG_PRIORITY_GAME_EVENT, "--Game Save Scripts--");
+
+    std::for_each(std::begin(scriptMgr.gameScripts), std::end(scriptMgr.gameScripts),
+        [](CCustomScript &script)
+    {
+        std::copy_n(script.m_aLargeLVars, 18, script.m_aLVarsForSave);
+    });
+
     scriptMgr.DisableAllScripts();
     game.Events.pfGameSaveScripts(a, b);
     scriptMgr.EnableAllScripts();
@@ -782,8 +780,8 @@ void GtaGame::OnMenuDrawing(float x, float y, wchar_t *text)
     wchar_t line[128];
     swprintf(line, L"CLEO v%d.%d.%d.%d", CLEO_VERSION_MAIN, CLEO_VERSION_MAJOR, CLEO_VERSION_MINOR, CLEO_VERSION_BINARY);
     game.Font.PrintString(ScreenCoord(30.0f), (float)*game.Screen.Height - ScreenCoord(34.0f), line);
-    scriptMgr.numLoadedCustomScripts ?
-        swprintf(line, L"%d %s, %d %s loaded", scriptMgr.numLoadedCustomScripts, scriptMgr.numLoadedCustomScripts == 1 ? L"script" : L"scripts",
+    scriptMgr.CustomScripts.size() ?
+        swprintf(line, L"%d %s, %d %s loaded", scriptMgr.CustomScripts.size(), scriptMgr.CustomScripts.size() == 1 ? L"script" : L"scripts",
             CleoPlugins::numLoadedPlugins, CleoPlugins::numLoadedPlugins == 1 ? L"plugin" : L"plugins") :
         swprintf(line, L"%d %s loaded", CleoPlugins::numLoadedPlugins, CleoPlugins::numLoadedPlugins == 1 ? L"plugin" : L"plugins");
     game.Font.PrintString(ScreenCoord(30.0f), (float)*game.Screen.Height - ScreenCoord(20.0f), line);

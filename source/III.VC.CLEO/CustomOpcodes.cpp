@@ -227,41 +227,22 @@ eOpcodeResult CustomOpcodes::GOSUB(CCustomScript *script)
 
 eOpcodeResult CustomOpcodes::TERMINATE_CUSTOM_THREAD(CCustomScript *script)
 {
-    game.Scripts.RemoveScriptFromList(script, game.Scripts.pActiveScriptsList);
-    script->RemoveFromCustomList(&scriptMgr.pCustomScripts);
-    scriptMgr.numLoadedCustomScripts--;
-    LOGL(LOG_PRIORITY_OPCODE, "TERMINATE_CUSTOM_THREAD: Terminating custom script \"%s\"", script->m_acName);
-    delete script;
+    scriptMgr.TerminateScriptByPointer(script);
     return OR_TERMINATE;
 }
 
 eOpcodeResult CustomOpcodes::TERMINATE_NAMED_CUSTOM_THREAD(CCustomScript *script)
 {
     char name[8];
-    script->ReadShortString(name);
-    CCustomScript *search = scriptMgr.pCustomScripts;
     eOpcodeResult result = OR_CONTINUE;
-    bool found = false;
-    while (search)
-    {
-        CCustomScript *next = search->m_pNextCustom;
-        if (!_stricmp(search->m_acName, name))
-        {
-            if (search == script)
-                result = OR_TERMINATE;
-            game.Scripts.RemoveScriptFromList(search, game.Scripts.pActiveScriptsList);
-            search->RemoveFromCustomList(&scriptMgr.pCustomScripts);
-            scriptMgr.numLoadedCustomScripts--;
-            LOGL(LOG_PRIORITY_OPCODE, "TERMINATE_NAMED_CUSTOM_THREAD: Terminating custom script with name \"%s\"", search->m_acName);
-            delete search;
-            found = true;
-        }
-        search = next;
-    }
-    if (found)
-        script->UpdateCompareFlag(true);
-    else
-        script->UpdateCompareFlag(false);
+
+    script->ReadShortString(name);
+    CCustomScript *dest = scriptMgr.TerminateScriptByName(name);
+    script->UpdateCompareFlag(dest != nullptr);
+
+    if (dest == script)
+        result = OR_TERMINATE;
+
     return result;
 }
 
@@ -271,18 +252,32 @@ eOpcodeResult CustomOpcodes::START_CUSTOM_THREAD(CCustomScript *script)
     script->ReadShortString(name);
     char filepath[MAX_PATH];
     sprintf(filepath, "%s%.8s", "cleo\\", name);
-    CCustomScript *newScript = new CCustomScript(filepath);
-    if (newScript && newScript->Loaded())
+
+    try
     {
-        newScript->AddToCustomList(&scriptMgr.pCustomScripts);
-        scriptMgr.numLoadedCustomScripts++;
+        scriptMgr.CustomScripts.emplace_back(filepath);
+    }
+    catch (std::bad_alloc *)
+    {
+        while ((*(tParamType *)(&game.Scripts.Space[script->m_dwIp])).type)
+            script->Collect(1);
+
+        LOGL(LOG_PRIORITY_OPCODE, "START_CUSTOM_THREAD: Script loading failed, \"%s\"", name);
+        script->m_dwIp++;
+        script->UpdateCompareFlag(false);
+        return OR_CONTINUE;
+    }
+
+    CCustomScript *newScript = &scriptMgr.CustomScripts.back();
+    if (newScript->Loaded())
+    {
         game.Scripts.AddScriptToList(newScript, game.Scripts.pActiveScriptsList);
         newScript->m_bIsActive = true;
         LOGL(LOG_PRIORITY_OPCODE, "START_CUSTOM_THREAD: Started new script \"%s\"", name);
         for (int i = 0; (*(tParamType *)(&game.Scripts.Space[script->m_dwIp])).type; i++)
         {
             script->Collect(1);
-            newScript->m_aLVars[i].nVar = game.Scripts.Params[0].nVar;
+            newScript->m_aLargeLVars[i].nVar = game.Scripts.Params[0].nVar;
         }
         script->UpdateCompareFlag(true);
     }
@@ -290,9 +285,11 @@ eOpcodeResult CustomOpcodes::START_CUSTOM_THREAD(CCustomScript *script)
     {
         while ((*(tParamType *)(&game.Scripts.Space[script->m_dwIp])).type)
             script->Collect(1);
+
         LOGL(LOG_PRIORITY_OPCODE, "START_CUSTOM_THREAD: Script loading failed, \"%s\"", name);
-        if (newScript)
-            delete newScript;
+
+        scriptMgr.CustomScripts.pop_back();
+
         script->UpdateCompareFlag(false);
     }
     script->m_dwIp++;
@@ -507,34 +504,14 @@ eOpcodeResult CustomOpcodes::GET_NAMED_THREAD_POINTER(CCustomScript *script)
 {
     char name[8];
     script->ReadShortString(name);
-    CCustomScript *result_ptr = 0;
-    CCustomScript *search = scriptMgr.pCustomScripts;
-    while (search)
-    {
-        if (!_stricmp(search->m_acName, name))
-        {
-            result_ptr = search;
-            break;
-        }
-        search = search->m_pNextCustom;
-    }
-    if (!result_ptr)
-    {
-        for (int i = 0; i < 128; i++)
-        {
-            if (!_stricmp(scriptMgr.gameScripts[i].m_acName, name))
-            {
-                result_ptr = &scriptMgr.gameScripts[i];
-                break;
-            }
-        }
-    }
+
+    CCustomScript *result_ptr = scriptMgr.FindScriptByName(name);
+
     game.Scripts.Params[0].pVar = result_ptr;
-    if (result_ptr)
-        script->UpdateCompareFlag(true);
-    else
-        script->UpdateCompareFlag(false);
+
+    script->UpdateCompareFlag(result_ptr != nullptr);
     script->Store(1);
+
     return OR_CONTINUE;
 }
 
@@ -784,19 +761,22 @@ eOpcodeResult CustomOpcodes::MATH_LOG(CCustomScript *script)
 
 eOpcodeResult CustomOpcodes::CALL_SCM_FUNCTION(CCustomScript *script)
 {
-    ScmFunction *pf = new ScmFunction;
-    memcpy(pf->vars, script->m_aLVars, 64);
-    pf->prev = script->m_pScmFunction;
-    script->m_pScmFunction = pf;
+    script->m_vecScmFunction.emplace_back();
+
+    ScmFunction *pf = &script->m_vecScmFunction.back();
+    memcpy(pf->originalVars, script->m_aLargeLVars, 64);
+    memcpy(pf->extraVars, script->m_aLargeLVars + 18, (LOCAL_VARS_COUNT - 18) * 4);//skip 16@ 17@
     script->Collect(2);
     int addr = game.Scripts.Params[0].nVar;
     unsigned int paramCount = game.Scripts.Params[1].nVar;
     if (paramCount > 0)
         script->Collect(paramCount);
-    memset(script->m_aLVars, 0, 64);
+    memset(script->m_aLargeLVars, 0, 64);
+    memset(script->m_aLargeLVars + 18, 0, (LOCAL_VARS_COUNT - 18) * 4);
+
     if (paramCount > 0)
-        memcpy(script->m_aLVars, game.Scripts.Params, paramCount * 4);
-    script->m_pScmFunction->retAddr = script->m_dwIp;
+        memcpy(script->m_aLargeLVars, game.Scripts.Params, paramCount * 4);
+    pf->retAddr = script->m_dwIp;
     script->JumpTo(addr);
     return OR_CONTINUE;
 }
@@ -807,14 +787,14 @@ eOpcodeResult CustomOpcodes::SCM_FUNCTION_RET(CCustomScript *script)
     unsigned int paramCount = game.Scripts.Params[0].nVar;
     if (paramCount > 0)
         script->Collect(paramCount);
-    memcpy(script->m_aLVars, script->m_pScmFunction->vars, 64);
-    script->m_dwIp = script->m_pScmFunction->retAddr;
+    memcpy(script->m_aLargeLVars, script->m_vecScmFunction.back().originalVars, 64);
+    memcpy(script->m_aLargeLVars, script->m_vecScmFunction.back().extraVars, (LOCAL_VARS_COUNT - 18) * 4);
+
+    script->m_dwIp = script->m_vecScmFunction.back().retAddr;
     if (paramCount > 0)
         script->Store(paramCount);
     script->m_dwIp++;
-    ScmFunction *prev = script->m_pScmFunction->prev;
-    delete script->m_pScmFunction;
-    script->m_pScmFunction = prev;
+    script->m_vecScmFunction.pop_back();
     return OR_CONTINUE;
 }
 
@@ -826,7 +806,7 @@ eOpcodeResult CustomOpcodes::GET_LABEL_OFFSET(CCustomScript *script)
     else
     {
         if (script->m_nScriptType == SCRIPT_TYPE_CUSTOM)
-            game.Scripts.Params[0].pVar = &script->m_pCodeData[-game.Scripts.Params[0].nVar];
+            game.Scripts.Params[0].pVar = &script->m_vecCodeData[-game.Scripts.Params[0].nVar];
         else
         {
 #ifdef CLEO_VC
@@ -834,7 +814,6 @@ eOpcodeResult CustomOpcodes::GET_LABEL_OFFSET(CCustomScript *script)
 #elif defined CLEO_III
             game.Scripts.Params[0].pVar = &game.Scripts.Space[0x20000 - game.Scripts.Params[0].nVar];
 #endif
-
         }
     }
     script->Store(1);
@@ -1068,18 +1047,32 @@ eOpcodeResult CustomOpcodes::START_CUSTOM_THREAD_VSTRING(CCustomScript *script)
     char filepath[MAX_PATH];
     strcpy(filepath, "cleo\\");
     strcat(filepath, game.Scripts.Params[0].cVar);
-    CCustomScript *newScript = new CCustomScript(filepath);
-    if (newScript && newScript->Loaded())
+
+    try
     {
-        newScript->AddToCustomList(&scriptMgr.pCustomScripts);
-        scriptMgr.numLoadedCustomScripts++;
+        scriptMgr.CustomScripts.emplace_back(filepath);
+    }
+    catch (std::bad_alloc *)
+    {
+        while (script->GetNextParamType())
+            script->Collect(1);
+
+        LOGL(LOG_PRIORITY_OPCODE, "START_CUSTOM_THREAD: Script loading failed, \"%s\"", script->m_acName);
+        script->UpdateCompareFlag(false);
+        script->m_dwIp++;
+        return OR_CONTINUE;
+    }
+
+    CCustomScript *newScript = &scriptMgr.CustomScripts.back();
+    if (newScript->Loaded())
+    {
         game.Scripts.AddScriptToList(newScript, game.Scripts.pActiveScriptsList);
         newScript->m_bIsActive = true;
         LOGL(LOG_PRIORITY_OPCODE, "START_CUSTOM_THREAD: Started new script \"%s\"", script->m_acName);
         for (int i = 0; script->GetNextParamType(); i++)
         {
             script->Collect(1);
-            newScript->m_aLVars[i].nVar = game.Scripts.Params[0].nVar;
+            newScript->m_aLargeLVars[i].nVar = game.Scripts.Params[0].nVar;
         }
         script->UpdateCompareFlag(true);
     }
@@ -1088,8 +1081,7 @@ eOpcodeResult CustomOpcodes::START_CUSTOM_THREAD_VSTRING(CCustomScript *script)
         while (script->GetNextParamType())
             script->Collect(1);
         LOGL(LOG_PRIORITY_OPCODE, "START_CUSTOM_THREAD: Script loading failed, \"%s\"", script->m_acName);
-        if (newScript)
-            delete newScript;
+        scriptMgr.CustomScripts.pop_back();
         script->UpdateCompareFlag(false);
     }
     script->m_dwIp++;

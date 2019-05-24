@@ -2,39 +2,58 @@
 #include "Game.h"
 #include "OpcodesSystem.h"
 #include <Windows.h>
-#include <stdio.h>
+#include <cstdio>
 #include "ScriptManager.h"
 #include "Log.h"
 
 void CCustomScript::Init()
 {
-    memset(this, 0, sizeof(CCustomScript));
+    m_pNext = nullptr;
+    m_pPrev = nullptr;
     strcpy(this->m_acName, "noname");
-    this->m_bDeathArrestCheckEnabled = true;
-}
+    m_dwIp = 0;
+    std::fill(std::begin(m_aGosubAddr), std::end(m_aGosubAddr), 0);
+    m_nCurrentGosub = 0;
+    m_nScriptType = SCRIPT_TYPE_DEFAULT;
+    std::fill(std::begin(m_aLVarsForSave), std::end(m_aLVarsForSave), tScriptVar{ 0 });
+    m_bIsActive = false;
+    m_bCondResult = false;
+    m_bIsMission = false;
+    m_bAwake = false;
+    m_dwWakeTime = 0;
+    m_wIfOp = 0;
+    m_bNotFlag = false;
+    m_bDeathArrestCheckEnabled = true;
+    m_bWastedOrBusted = false;
+    m_bMissionFlag = false;
+    _pad = 0;
 
-CCustomScript::CCustomScript()
-{
+    m_nLastPedSearchIndex = 0;
+    m_nLastVehicleSearchIndex = 0;
+    m_nLastObjectSearchIndex = 0;
 
+    m_Errors.m_bFileNotFound = false;
+    m_Errors.m_bFileSeekError = false;
+    m_Errors.m_bInternalError = false;
+    m_Errors.m_bEmptyFile = false;
+    m_Errors.m_bAllocationFailed = false;
+    m_Errors.m_bEofReached = false;
+    m_dwBaseIp = 0;
+
+#ifdef CLEO_VC
+    std::fill(std::begin(m_aLargeLVars), std::end(m_aLargeLVars), tScriptVar{ 0 });
+#endif
 }
 
 bool CCustomScript::Loaded()
 {
-    if (this->m_Errors.m_bAllocationFailed || this->m_Errors.m_bEmptyFile || this->m_Errors.m_bEofReached
-        || this->m_Errors.m_bFileNotFound || this->m_Errors.m_bFileSeekError || this->m_Errors.m_bInternalError)
-        return false;
-    return true;
-}
-
-CCustomScript::~CCustomScript()
-{
-    ScmFunction *scmf = this->m_pScmFunction;
-    while (scmf)
-    {
-        ScmFunction *prev = scmf->prev;
-        delete scmf;
-        scmf = prev;
-    }
+    return !(
+        this->m_Errors.m_bAllocationFailed ||
+        this->m_Errors.m_bEmptyFile ||
+        this->m_Errors.m_bEofReached ||
+        this->m_Errors.m_bFileNotFound ||
+        this->m_Errors.m_bFileSeekError ||
+        this->m_Errors.m_bInternalError);
 }
 
 CCustomScript::CCustomScript(const char *filepath)
@@ -70,24 +89,31 @@ CCustomScript::CCustomScript(const char *filepath)
         this->m_Errors.m_bFileSeekError = true;
         return;
     }
-    this->m_pCodeData = scriptMgr.AllocateMemoryForScript(filepath, filesize);
-    if (!this->m_pCodeData)
+
+    try
     {
+        this->m_vecCodeData.resize(filesize);
+    }
+    catch (std::bad_alloc *)
+    {
+        LOGL(LOG_PRIORITY_MEMORY_ALLOCATION, "Failed to allocate memory for script: \"%s\", %d", filepath, filesize);
         LOGL(LOG_PRIORITY_SCRIPT_LOADING, "Error(script loading): %s, \"Allocation Failed\"", filepath);
         fclose(file);
         this->m_Errors.m_bAllocationFailed = true;
         return;
     }
-    this->m_dwBaseIp = (unsigned int)this->m_pCodeData - (unsigned int)game.Scripts.Space;
+
+    this->m_dwBaseIp = (unsigned int)this->m_vecCodeData.data() - (unsigned int)game.Scripts.Space;
     this->m_bMissionFlag = 0;
     this->m_dwIp = this->m_dwBaseIp;
-    if (!fread(this->m_pCodeData, 1, filesize, file))
+    if (!fread(this->m_vecCodeData.data(), 1, filesize, file))
     {
         if (ferror(file))
         {
             LOGL(LOG_PRIORITY_SCRIPT_LOADING, "Error(script loading): %s, \"Internal Error\"", filepath);
-            scriptMgr.DeleteScriptMemory(filepath, this->m_pCodeData);
-            this->m_pCodeData = 0;
+            LOGL(LOG_PRIORITY_MEMORY_ALLOCATION, "Deleted script memory: \"%s\"", filepath);
+            this->m_vecCodeData.clear();
+            this->m_vecCodeData.shrink_to_fit();
             this->m_dwBaseIp = this->m_dwIp = 0;
             this->m_Errors.m_bInternalError = true;
             fclose(file);
@@ -96,8 +122,9 @@ CCustomScript::CCustomScript(const char *filepath)
         else if (feof(file))
         {
             LOGL(LOG_PRIORITY_SCRIPT_LOADING, "Error(script loading): %s, \"EOF Reached\"", filepath);
-            scriptMgr.DeleteScriptMemory(filepath, this->m_pCodeData);
-            this->m_pCodeData = 0;
+            LOGL(LOG_PRIORITY_MEMORY_ALLOCATION, "Deleted script memory: \"%s\"", filepath);
+            this->m_vecCodeData.clear();
+            this->m_vecCodeData.shrink_to_fit();
             this->m_dwBaseIp = this->m_dwIp = 0;
             this->m_Errors.m_bEofReached = true;
             fclose(file);
@@ -107,16 +134,15 @@ CCustomScript::CCustomScript(const char *filepath)
     if (fclose(file) == -1)
     {
         LOGL(LOG_PRIORITY_SCRIPT_LOADING, "Error(script loading): %s, \"Internal Error\"", filepath);
-        scriptMgr.DeleteScriptMemory(filepath, this->m_pCodeData);
-        this->m_pCodeData = 0;
+        LOGL(LOG_PRIORITY_MEMORY_ALLOCATION, "Deleted script memory: \"%s\"", filepath);
+        this->m_vecCodeData.clear();
+        this->m_vecCodeData.shrink_to_fit();
         this->m_dwBaseIp = this->m_dwIp = 0;
         this->m_Errors.m_bInternalError = true;
         fclose(file);
         return;
     }
     strncpy(this->m_acName, &strrchr(filepath, '\\')[1], 8);
-    this->m_pPrevCustom = NULL;
-    this->m_pNextCustom = NULL;
     memset(&this->m_Errors, 0, 4);
     this->m_acName[7] = 0;
     LOGL(LOG_PRIORITY_SCRIPT_LOADING, "Loaded script \"%s\" from \"%s\"", this->m_acName, filepath);
@@ -127,25 +153,6 @@ void CCustomScript::ReadShortString(char *out)
     strncpy(out, &game.Scripts.Space[this->m_dwIp], 7);
     out[7] = '\0';
     this->m_dwIp += 8;
-}
-
-void CCustomScript::AddToCustomList(CCustomScript **list)
-{
-    this->m_pNextCustom = *list;
-    this->m_pPrevCustom = 0;
-    if (*list)
-        (*list)->m_pPrevCustom = this;
-    *list = this;
-}
-
-void CCustomScript::RemoveFromCustomList(CCustomScript **list)
-{
-    if (this->m_pPrevCustom)
-        this->m_pPrevCustom->m_pNextCustom = this->m_pNextCustom;
-    else
-        *list = this->m_pNextCustom;
-    if (this->m_pNextCustom)
-        this->m_pNextCustom->m_pPrevCustom = this->m_pPrevCustom;
 }
 
 void CCustomScript::JumpTo(int address)
@@ -163,9 +170,9 @@ void CCustomScript::JumpTo(int address)
 #elif defined CLEO_III
             this->m_dwIp = 0x20000 - address;
 #endif
-        }
     }
 }
+    }
 
 eParamType CCustomScript::GetNextParamType()
 {
@@ -205,7 +212,7 @@ void CCustomScript::Collect(unsigned int *pIp, unsigned int numParams)
             *pIp += 2;
             break;
         case PARAM_TYPE_LVAR:
-            game.Scripts.Params[i].nVar = this->m_aLVars[*(unsigned short *)&game.Scripts.Space[*pIp]].nVar;
+            game.Scripts.Params[i].nVar = this->m_aLargeLVars[*(unsigned short *)&game.Scripts.Space[*pIp]].nVar;
             *pIp += 2;
             break;
         case PARAM_TYPE_INT8:
@@ -256,7 +263,7 @@ tScriptVar CCustomScript::CollectNextWithoutIncreasingPC(unsigned int ip)
             auto fParam = ((float)(*(short *)&game.Scripts.Space[ip]) / 16.0f);
             result.fVar = *(float*)&fParam;
             break;
-        }
+    }
 #endif
     case PARAM_TYPE_INT32:
         result.nVar = *(int *)&game.Scripts.Space[ip];
@@ -267,7 +274,7 @@ tScriptVar CCustomScript::CollectNextWithoutIncreasingPC(unsigned int ip)
         break;
 
     case PARAM_TYPE_LVAR:
-        result = this->m_aLVars[*(unsigned short *)&game.Scripts.Space[ip]];
+        result = this->m_aLargeLVars[*(unsigned short *)&game.Scripts.Space[ip]];
         break;
 
     case PARAM_TYPE_INT8:
@@ -294,10 +301,10 @@ tScriptVar CCustomScript::CollectNextWithoutIncreasingPC(unsigned int ip)
         result.cVar = &game.Scripts.Space[ip - 1];
         break;
 
-    }
+}
 
     return result;
-}
+    }
 
 void CCustomScript::Store(unsigned int numParams)
 {

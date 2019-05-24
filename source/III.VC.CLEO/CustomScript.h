@@ -1,4 +1,11 @@
 ﻿#pragma once
+#include <vector>
+
+#ifdef CLEO_III
+#error GTA III version is unusable now.
+#endif
+
+#define LOCAL_VARS_COUNT 32
 
 enum eScriptType :unsigned short
 {
@@ -41,8 +48,9 @@ struct tParamType
 
 struct ScmFunction
 {
-    ScmFunction *prev;
-    tScriptVar vars[16];
+    tScriptVar originalVars[16];
+    tScriptVar extraVars[LOCAL_VARS_COUNT - 18];
+
     int retAddr;
 };
 
@@ -56,7 +64,7 @@ public:
     /* 0x14 */ unsigned int m_aGosubAddr[6];
     /* 0x2C */ unsigned short m_nCurrentGosub;
     /* 0x2E */ eScriptType m_nScriptType; // see eScriptType
-    /* 0x30 */ tScriptVar m_aLVars[18];
+    /* 0x30 */ tScriptVar m_aLVarsForSave[18];
 #ifdef CLEO_VC
     /* 0x78 */ bool m_bIsActive;
     /* 0x79 */ bool m_bCondResult;
@@ -87,22 +95,15 @@ public:
         unsigned int m_bAllocationFailed : 1;
         unsigned int m_bEofReached : 1;
     } m_Errors;
-    char *m_pCodeData;
+    std::vector<char> m_vecCodeData;
     unsigned int m_dwBaseIp;
-    ScmFunction *m_pScmFunction;
-    CCustomScript *m_pNextCustom;
-    CCustomScript *m_pPrevCustom;
+    std::vector<ScmFunction> m_vecScmFunction;
 
-#ifdef CLEO_VC
-    tScriptVar m_aLargeLVars[1024];
-#endif
+    tScriptVar m_aLargeLVars[LOCAL_VARS_COUNT];
+
     void Init();
 
     bool Loaded();
-
-    void AddToCustomList(CCustomScript **list);
-
-    void RemoveFromCustomList(CCustomScript **list);
 
     void Collect(unsigned int numParams);
 
@@ -120,19 +121,11 @@ public:
 
     tScriptVar *GetPointerToScriptVariable();
 
-    CCustomScript();
+    CCustomScript() = default;
 
     CCustomScript(const char *filepath);
-
-    ~CCustomScript();
 
     void JumpTo(int address);
 
     eOpcodeResult ProcessOneCommand();
 };
-
-#ifdef CLEO_VC
-static_assert(sizeof(CCustomScript) == 0x10AC, "Error with CCustomScript");
-#else
-static_assert(sizeof(CCustomScript) == 0xAC, "Error with CCustomScript");
-#endif

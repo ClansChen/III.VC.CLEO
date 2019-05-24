@@ -2,9 +2,11 @@
 //https://github.com/ThirteenAG/Hooking.Patterns
 
 #pragma once
-#include <windows.h>
+#include <Windows.h>
 #include <cstdint>
 #include <cstddef>
+#include <cstdio>
+#include <cwchar>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -16,7 +18,7 @@ class memory_pointer
 {
 public:
     memory_pointer() :_address(0) {}
-    memory_pointer(void *pointer) :_address(reinterpret_cast<std::intptr_t>(pointer)) {}
+    memory_pointer(const void *pointer) :_address(reinterpret_cast<std::intptr_t>(pointer)) {}
     explicit memory_pointer(std::intptr_t address) :_address(address) {}
 
     template <typename T>
@@ -30,7 +32,7 @@ public:
         return (_address + offset);
     }
 
-    memory_pointer &operator=(void *pointer)
+    memory_pointer &operator=(const void *pointer)
     {
         _address = reinterpret_cast<std::intptr_t>(pointer);
     }
@@ -77,6 +79,7 @@ class byte_pattern
     void bm_preprocess();
     void bm_search();
 
+    static std::string make_bytes_literal(memory_pointer pointer, std::size_t length);
     void debug_output() const;
 
 public:

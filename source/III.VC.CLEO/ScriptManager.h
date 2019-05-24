@@ -8,23 +8,13 @@ class ScriptManager
 public:
     CCustomScript gameScripts[128];
 
-    std::list<char *> scriptMemory;
-
-    CCustomScript *pCustomScripts;
-
-    unsigned int numLoadedCustomScripts;
-
-    ScriptManager();
+    std::list<CCustomScript> CustomScripts;
 
     CCustomScript *FindScriptByName(const char *name);
 
-    void TerminateScriptByName(const char *name);
+    CCustomScript *TerminateScriptByName(const char *name);
 
-    char *AllocateMemoryForScript(const char *scriptName, unsigned int size);
-
-    void DeleteScriptMemory(const char *scriptName, char *data);
-
-    void ReleaseScriptsMemory();
+    void TerminateScriptByPointer(CCustomScript *pScript);
 
     void LoadScripts();
 
