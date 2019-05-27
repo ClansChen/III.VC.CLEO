@@ -53,9 +53,8 @@ struct CTextDrawer
 
 class GtaGame
 {
-    void InitialiseGameVersion();
-
 public:
+    void InitialiseGameVersion();
     void PatchLocalVars();
     void InitAndPatch();
 
@@ -99,7 +98,7 @@ public:
         tScriptVar *(__thiscall *GetPointerToScriptVariable)(CCustomScript *, unsigned int *, unsigned char);
     } Scripts;
     struct _Text {
-        wchar_t *(__thiscall *pfGetText)(int, char *);
+        const wchar_t *(__thiscall *pfGetText)(int, const char *);
 #ifdef CLEO_VC
         void(__cdecl *TextBox)(const wchar_t *text, bool flag1, bool infinite, bool flag2);
 #elif defined CLEO_III

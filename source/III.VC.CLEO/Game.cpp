@@ -25,6 +25,7 @@ DWORD WINAPI SteamHandler(LPVOID)
     while (true)
     {
         Sleep(0);
+        game.InitialiseGameVersion();
         if (game.GetGameVersion() == GAME_VSTEAM) break;
     }
     game.Version = GAME_VSTEAM;
@@ -102,10 +103,10 @@ void GtaGame::InitAndPatch()
         CPatch::SetPointer(0x45050E, (DWORD*)(scriptMgr.gameScripts) + 1);
         CPatch::SetInt(0x450527 + 2, sizeof(CCustomScript));
         CPatch::SetInt(0x45052D + 2, sizeof(CCustomScript));
-        CPatch::RedirectJump(0x450CF0, ScriptManager::InitialiseScript);
-        CPatch::RedirectJump(0x44FBE0, ScriptManager::ProcessScriptCommand);
-        CPatch::RedirectJump(0x451010, ScriptManager::CollectScriptParameters);
-        CPatch::RedirectJump(0x450EF0, ScriptManager::CollectScriptNextParameterWithoutIncreasingPC);
+        CPatch::RedirectJump(0x450CF0, (void *)&CCustomScript::InitWrap);
+        CPatch::RedirectJump(0x44FBE0, (void *)&CCustomScript::ProcessOneCommandWrap);
+        CPatch::RedirectJump(0x451010, (void *)&CCustomScript::CollectWrap);
+        CPatch::RedirectJump(0x450EF0, (void *)&CCustomScript::CollectScriptNextParameterWithoutIncreasingPCWrap);
         this->Scripts.AddScriptToList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x4502E0;
         this->Scripts.RemoveScriptFromList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x450300;
         this->Scripts.StoreParameters = (void(__thiscall *)(CCustomScript *, unsigned int *, unsigned int))0x450E50;
@@ -131,7 +132,7 @@ void GtaGame::InitAndPatch()
         this->Scripts.Space = (char *)0x821280;
         this->Scripts.pNumOpcodesExecuted = (unsigned short *)0xA10A66;
         // Text
-        this->Text.pfGetText = (wchar_t *(__thiscall *)(int, char *))0x584DA2;
+        this->Text.pfGetText = (const wchar_t *(__thiscall *)(int, const char *))0x584DA2;
         CPatch::SetInt(0x584DA2, 0xD98B5553); //push ebx push ebp mov ebx,ecx
         CPatch::SetInt(0x584DA6, 0xE940EC83); //sub esp,40 
         CPatch::SetInt(0x584DAA, 0x00000189); //jmp 584F37
@@ -206,10 +207,10 @@ void GtaGame::InitAndPatch()
         CPatch::SetPointer(0x45050E, (DWORD*)(scriptMgr.gameScripts) + 1);
         CPatch::SetInt(0x450527 + 2, sizeof(CCustomScript));
         CPatch::SetInt(0x45052D + 2, sizeof(CCustomScript));
-        CPatch::RedirectJump(0x450CF0, ScriptManager::InitialiseScript);
-        CPatch::RedirectJump(0x44FBE0, ScriptManager::ProcessScriptCommand);
-        CPatch::RedirectJump(0x451010, ScriptManager::CollectScriptParameters);
-        CPatch::RedirectJump(0x450EF0, ScriptManager::CollectScriptNextParameterWithoutIncreasingPC);
+        CPatch::RedirectJump(0x450CF0, (void *)&CCustomScript::InitWrap);
+        CPatch::RedirectJump(0x44FBE0, (void *)&CCustomScript::ProcessOneCommandWrap);
+        CPatch::RedirectJump(0x451010, (void *)&CCustomScript::CollectWrap);
+        CPatch::RedirectJump(0x450EF0, (void *)&CCustomScript::CollectScriptNextParameterWithoutIncreasingPCWrap);
         this->Scripts.AddScriptToList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x4502E0;
         this->Scripts.RemoveScriptFromList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x450300;
         this->Scripts.StoreParameters = (void(__thiscall *)(CCustomScript *, unsigned int *, unsigned int))0x450E50;
@@ -235,7 +236,7 @@ void GtaGame::InitAndPatch()
         this->Scripts.Space = (char *)(0x821280 + 0x8);
         this->Scripts.pNumOpcodesExecuted = (unsigned short *)0xA10A6E;
         // Text
-        this->Text.pfGetText = (wchar_t *(__thiscall *)(int, char *))0x584DC2;
+        this->Text.pfGetText = (const wchar_t *(__thiscall *)(int, const char *))0x584DC2;
         CPatch::SetInt(0x584DC2, 0xD98B5553); //push ebx push ebp mov ebx,ecx
         CPatch::SetInt(0x584DC6, 0xE940EC83); //sub esp,40 
         CPatch::SetInt(0x584DCA, 0x00000189); //jmp 584F37
@@ -310,10 +311,10 @@ void GtaGame::InitAndPatch()
         CPatch::SetPointer(0x45041E, (DWORD*)(scriptMgr.gameScripts) + 1);
         CPatch::SetInt(0x450437 + 2, sizeof(CCustomScript));
         CPatch::SetInt(0x45043D + 2, sizeof(CCustomScript));
-        CPatch::RedirectJump(0x450C00, ScriptManager::InitialiseScript);
-        CPatch::RedirectJump(0x44FAF0, ScriptManager::ProcessScriptCommand);
-        CPatch::RedirectJump(0x450F20, ScriptManager::CollectScriptParameters);
-        CPatch::RedirectJump(0x450E00, ScriptManager::CollectScriptNextParameterWithoutIncreasingPC);
+        CPatch::RedirectJump(0x450C00, (void *)&CCustomScript::InitWrap);
+        CPatch::RedirectJump(0x44FAF0, (void *)&CCustomScript::ProcessOneCommandWrap);
+        CPatch::RedirectJump(0x450F20, (void *)&CCustomScript::CollectWrap);
+        CPatch::RedirectJump(0x450E00, (void *)&CCustomScript::CollectScriptNextParameterWithoutIncreasingPCWrap);
         this->Scripts.AddScriptToList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x4501F0;
         this->Scripts.RemoveScriptFromList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x450210;
         this->Scripts.StoreParameters = (void(__thiscall *)(CCustomScript *, unsigned int *, unsigned int))0x450D60;
@@ -339,7 +340,7 @@ void GtaGame::InitAndPatch()
         this->Scripts.Space = (char *)0x820288;
         this->Scripts.pNumOpcodesExecuted = (unsigned short *)0xA0FA6E;
         // Text
-        this->Text.pfGetText = (wchar_t *(__thiscall *)(int, char *))0x584BD2;
+        this->Text.pfGetText = (const wchar_t *(__thiscall *)(int, const char *))0x584BD2;
         CPatch::SetInt(0x584BD2, 0xD98B5553); //push ebx push ebp mov ebx,ecx
         CPatch::SetInt(0x584BD6, 0xE940EC83); //sub esp,40 
         CPatch::SetInt(0x584BDA, 0x00000189); //jmp 584F37
@@ -417,10 +418,10 @@ void GtaGame::InitAndPatch()
         // Scripts
         CPatch::SetPointer(0x438809, scriptMgr.gameScripts);
         CPatch::SetInt(0x43882A, sizeof(CCustomScript));
-        CPatch::RedirectJump(0x4386C0, ScriptManager::InitialiseScript);
-        CPatch::RedirectJump(0x439500, ScriptManager::ProcessScriptCommand);
-        CPatch::RedirectJump(0x4382E0, ScriptManager::CollectScriptParameters);
-        CPatch::RedirectJump(0x438460, ScriptManager::CollectScriptNextParameterWithoutIncreasingPC);
+        CPatch::RedirectJump(0x4386C0, (void *)&CCustomScript::InitWrap);
+        CPatch::RedirectJump(0x439500, (void *)&CCustomScript::ProcessOneCommandWrap);
+        CPatch::RedirectJump(0x4382E0, (void *)&CCustomScript::CollectWrap);
+        CPatch::RedirectJump(0x438460, (void *)&CCustomScript::CollectScriptNextParameterWithoutIncreasingPCWrap);
         this->Scripts.AddScriptToList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x438FE0;
         this->Scripts.RemoveScriptFromList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x438FB0;
         this->Scripts.StoreParameters = (void(__thiscall *)(CCustomScript *, unsigned int *, unsigned int))0x4385A0;
@@ -443,7 +444,7 @@ void GtaGame::InitAndPatch()
         this->Scripts.Space = (char *)0x74B248;
         this->Scripts.pNumOpcodesExecuted = (unsigned short *)0x95CCA6;
         // Text
-        this->Text.pfGetText = (wchar_t *(__thiscall *)(int, char *))0x52BFB0;
+        this->Text.pfGetText = (const wchar_t *(__thiscall *)(int, const char *))0x52BFB0;
         CPatch::RedirectJump(0x52C5A0, CustomText::GetText);
         this->Text.CText = 0x941520;
         this->Text.textDrawers = (CTextDrawer *)0x70EA68;
@@ -506,10 +507,10 @@ void GtaGame::InitAndPatch()
         // Scripts
         CPatch::SetPointer(0x438809, scriptMgr.gameScripts);
         CPatch::SetInt(0x43882A, sizeof(CCustomScript));
-        CPatch::RedirectJump(0x4386C0, ScriptManager::InitialiseScript);
-        CPatch::RedirectJump(0x439500, ScriptManager::ProcessScriptCommand);
-        CPatch::RedirectJump(0x4382E0, ScriptManager::CollectScriptParameters);
-        CPatch::RedirectJump(0x438460, ScriptManager::CollectScriptNextParameterWithoutIncreasingPC);
+        CPatch::RedirectJump(0x4386C0, (void *)&CCustomScript::InitWrap);
+        CPatch::RedirectJump(0x439500, (void *)&CCustomScript::ProcessOneCommandWrap);
+        CPatch::RedirectJump(0x4382E0, (void *)&CCustomScript::CollectWrap);
+        CPatch::RedirectJump(0x438460, (void *)&CCustomScript::CollectScriptNextParameterWithoutIncreasingPCWrap);
         this->Scripts.AddScriptToList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x438FE0;
         this->Scripts.RemoveScriptFromList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x438FB0;
         this->Scripts.StoreParameters = (void(__thiscall *)(CCustomScript *, unsigned int *, unsigned int))0x4385A0;
@@ -532,7 +533,7 @@ void GtaGame::InitAndPatch()
         this->Scripts.Space = (char *)0x74B248;
         this->Scripts.pNumOpcodesExecuted = (unsigned short *)0x95CE5E;
         // Text
-        this->Text.pfGetText = (wchar_t *(__thiscall *)(int, char *))0x52C1F0;
+        this->Text.pfGetText = (const wchar_t *(__thiscall *)(int, const char *))0x52C1F0;
         CPatch::RedirectJump(0x52C7E0, CustomText::GetText);
         this->Text.CText = 0x9416D8;
         this->Text.textDrawers = (CTextDrawer *)0x70EA68;
@@ -595,10 +596,10 @@ void GtaGame::InitAndPatch()
         // Scripts
         CPatch::SetPointer(0x438809, scriptMgr.gameScripts);
         CPatch::SetInt(0x43882A, sizeof(CCustomScript));
-        CPatch::RedirectJump(0x4386C0, ScriptManager::InitialiseScript);
-        CPatch::RedirectJump(0x439500, ScriptManager::ProcessScriptCommand);
-        CPatch::RedirectJump(0x4382E0, ScriptManager::CollectScriptParameters);
-        CPatch::RedirectJump(0x438460, ScriptManager::CollectScriptNextParameterWithoutIncreasingPC);
+        CPatch::RedirectJump(0x4386C0, (void *)&CCustomScript::InitWrap);
+        CPatch::RedirectJump(0x439500, (void *)&CCustomScript::ProcessOneCommandWrap);
+        CPatch::RedirectJump(0x4382E0, (void *)&CCustomScript::CollectWrap);
+        CPatch::RedirectJump(0x438460, (void *)&CCustomScript::CollectScriptNextParameterWithoutIncreasingPCWrap);
         this->Scripts.AddScriptToList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x438FE0;
         this->Scripts.RemoveScriptFromList = (void(__thiscall *)(CCustomScript *, CCustomScript **))0x438FB0;
         this->Scripts.StoreParameters = (void(__thiscall *)(CCustomScript *, unsigned int *, unsigned int))0x4385A0;
@@ -621,7 +622,7 @@ void GtaGame::InitAndPatch()
         this->Scripts.Space = (char *)0x75B388;
         this->Scripts.pNumOpcodesExecuted = (unsigned short *)0x96CF9E;
         // Text
-        this->Text.pfGetText = (wchar_t *(__thiscall *)(int, char *))0x52C180;
+        this->Text.pfGetText = (const wchar_t *(__thiscall *)(int, const char *))0x52C180;
         CPatch::RedirectJump(0x52C770, CustomText::GetText);
         this->Text.CText = 0x951818;
         this->Text.textDrawers = (CTextDrawer *)0x71EBA8;
@@ -782,7 +783,7 @@ void GtaGame::OnMenuDrawing(float x, float y, wchar_t *text)
     game.Font.PrintString(ScreenCoord(30.0f), (float)*game.Screen.Height - ScreenCoord(34.0f), line);
     scriptMgr.CustomScripts.size() ?
         swprintf(line, L"%d %s, %d %s loaded", scriptMgr.CustomScripts.size(), scriptMgr.CustomScripts.size() == 1 ? L"script" : L"scripts",
-            CleoPlugins::numLoadedPlugins, CleoPlugins::numLoadedPlugins == 1 ? L"plugin" : L"plugins") :
-        swprintf(line, L"%d %s loaded", CleoPlugins::numLoadedPlugins, CleoPlugins::numLoadedPlugins == 1 ? L"plugin" : L"plugins");
+            CleoPlugins::plugins.size(), CleoPlugins::plugins.size() == 1 ? L"plugin" : L"plugins") :
+        swprintf(line, L"%d %s loaded", CleoPlugins::plugins.size(), CleoPlugins::plugins.size() == 1 ? L"plugin" : L"plugins");
     game.Font.PrintString(ScreenCoord(30.0f), (float)*game.Screen.Height - ScreenCoord(20.0f), line);
 }

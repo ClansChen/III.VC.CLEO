@@ -137,23 +137,3 @@ void ScriptManager::EnableAllScripts()
         LOGL(LOG_PRIORITY_SCRIPT_LOADING, "Enabled script \"%s\"", script.m_acName);
     }
 }
-
-void ScriptManager::InitialiseScript(CCustomScript *script)
-{
-    script->Init();
-}
-
-eOpcodeResult ScriptManager::ProcessScriptCommand(CCustomScript *script)
-{
-    return script->ProcessOneCommand();
-}
-
-void ScriptManager::CollectScriptParameters(CCustomScript *script, int, unsigned int *pIp, unsigned int numParams)
-{
-    script->Collect(pIp, numParams);
-}
-
-tScriptVar ScriptManager::CollectScriptNextParameterWithoutIncreasingPC(CCustomScript *script, int, unsigned int ip)
-{
-    return script->CollectNextWithoutIncreasingPC(ip);
-}

@@ -1,156 +1,139 @@
-#include "Fxt.h"
+﻿#include "Fxt.h"
 #include <stdio.h>
 #include <Windows.h>
+#include <algorithm>
+#include <iterator>
 #include "Log.h"
 #include "Game.h"
 
-CustomTextEntry *CustomText::pCustomTextList;
+std::unordered_map<std::string, std::wstring> CustomText::CustomTexts;
 
-CustomTextEntry::CustomTextEntry(char *key, char *text)
+const wchar_t *CustomText::GetText(int theText, int, const char *key)
 {
-    size_t len = strlen(text);
-	this->m_pText = new wchar_t[len + 1];
-	for(size_t i = 0; i < len; i++)
-		this->m_pText[i] =  (unsigned char)text[i];
-	this->m_pText[len] = 0;
-	strncpy(m_key, key, 7);
-	this->m_key[7] = '\0';
-	LOGL(LOG_PRIORITY_CUSTOM_TEXT, "Registered custom text: \"%s\", \"%s\"", this->m_key, text);
-}
+    const wchar_t *result = nullptr;
 
-CustomTextEntry::~CustomTextEntry()
-{
-	if(this->m_pText)
-		delete m_pText;
-}
+    auto it = CustomTexts.find(key);
 
-wchar_t *CustomText::GetText(int theText, int, char *key)
-{
-	wchar_t *result = NULL;
-	CustomTextEntry *entry = pCustomTextList;
-	while(entry)
-	{
-		if(!_stricmp(entry->m_key, key))
-		{
-			result = entry->m_pText;
-			break;
-		}
-		entry = entry->m_pNext;
-	}
-	if(!result)
-		result = game.Text.pfGetText(theText, key);
-	if(!result)
-		return L"";
-	return result;
+    if (it != CustomTexts.end())
+    {
+        result = it->second.c_str();
+    }
+    else
+    {
+        result = game.Text.pfGetText(theText, key);
+
+        if (result == nullptr)
+            return L"";
+    }
+
+    return result;
 }
 
 char *StrFindKeyBegin(char *str)
 {
-	while(*str && *str != '\n' && *str != '\r' && *str != ';' && *str != '#')
-	{
-		if(*str != ' ' && *str != '\t')
-			return str;
-		str++;
-	}
-	return NULL;
+    while (*str && *str != '\n' && *str != '\r' && *str != ';' && *str != '#')
+    {
+        if (*str != ' ' && *str != '\t')
+            return str;
+        str++;
+    }
+    return NULL;
 }
 
 char *StrFindKeyEnd(char *str)
 {
-	while(*str && *str != '\n' && *str != '\r' && *str != ';' && *str != '#')
-	{
-		if(*str == ' ' || *str == '\t')
-			return str;
-		str++;
-	}
-	return NULL;
+    while (*str && *str != '\n' && *str != '\r' && *str != ';' && *str != '#')
+    {
+        if (*str == ' ' || *str == '\t')
+            return str;
+        str++;
+    }
+    return NULL;
 }
 
 char *StrFindTextBegin(char *str)
 {
-	while(*str && *str != '\n' && *str != '\r')
-	{
-		if(str[0] == '\\' && str[1] == '$')
-			return str + 2;
-		if(*str != ' ' && *str != '\t')
-			return str;
-		str++;
-	}
-	return NULL;
+    while (*str && *str != '\n' && *str != '\r')
+    {
+        if (str[0] == '\\' && str[1] == '$')
+            return str + 2;
+        if (*str != ' ' && *str != '\t')
+            return str;
+        str++;
+    }
+    return NULL;
 }
 
 char *StrFindTextEnd(char *str)
 {
-	while(*str != '\0' && *str != '\n' && *str != '\r')
-		str++;
-	return str;
+    while (*str != '\0' && *str != '\n' && *str != '\r')
+        str++;
+    return str;
 }
 
-void CustomText::LoadFxtFile(char *filepath)
+void CustomText::LoadFxtFile(const char *filepath)
 {
-	FILE *fxt = fopen(filepath, "rt");
-	char line[512];
-	if(fgets(line, 512, fxt))
-	{
-		do
-		{
-			char *keyBegin = StrFindKeyBegin(line);
-			if(keyBegin)
-			{
-				char *keyEnd = StrFindKeyEnd(&keyBegin[1]);
-				if(keyEnd)
-				{
-					*keyEnd = '\0';
-					char *textBegin = StrFindTextBegin(&keyEnd[1]);
-					if(textBegin)
-					{
-						char *textEnd = StrFindTextEnd(&textBegin[1]);
-						*textEnd = '\0';
-						CustomTextEntry *entry = new CustomTextEntry(keyBegin, textBegin);
-						if(entry)
-						{
-							entry->m_pNext = CustomText::pCustomTextList;
-							CustomText::pCustomTextList = entry;
-						}
-					}
-				}
-			}
-		}
-		while(fgets(line, 512, fxt));
-	}
+    std::string key;
+    std::wstring text;
+
+    FILE *fxt = fopen(filepath, "rt");
+    char line[512];
+    if (fgets(line, 512, fxt))
+    {
+        do
+        {
+            char *keyBegin = StrFindKeyBegin(line);
+            if (keyBegin)
+            {
+                char *keyEnd = StrFindKeyEnd(&keyBegin[1]);
+                if (keyEnd)
+                {
+                    *keyEnd = '\0';
+                    char *textBegin = StrFindTextBegin(&keyEnd[1]);
+                    if (textBegin)
+                    {
+                        char *textEnd = StrFindTextEnd(&textBegin[1]);
+                        *textEnd = '\0';
+
+                        text.clear();
+                        std::copy_n(textBegin, strlen(textBegin), std::back_inserter(text));
+                        CustomTexts.insert_or_assign(keyBegin, text);
+
+                        LOGL(LOG_PRIORITY_CUSTOM_TEXT, "Registered custom text: \"%s\", \"%s\"", keyBegin, textBegin);
+                    }
+                }
+            }
+        } while (fgets(line, 512, fxt));
+    }
 }
 
 void CustomText::Load()
 {
-	WIN32_FIND_DATA FindFileData;
-	memset(&FindFileData, 0, sizeof(WIN32_FIND_DATA));
-	HANDLE hFind = FindFirstFile("CLEO\\CLEO_TEXT\\*.fxt", &FindFileData);
-	if(hFind != INVALID_HANDLE_VALUE)
-	{
-		do
-		{
-			if(!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-			{
-				char filename[MAX_PATH];
-				strcpy(filename, "CLEO\\CLEO_TEXT\\");
-				strcat(filename, FindFileData.cFileName);
-				LoadFxtFile(filename);
-			}
-		}
-		while(FindNextFile(hFind, &FindFileData) );
-		FindClose(hFind);
-	}
+    WIN32_FIND_DATA FindFileData;
+    memset(&FindFileData, 0, sizeof(WIN32_FIND_DATA));
+    HANDLE hFind = FindFirstFile("CLEO\\CLEO_TEXT\\*.fxt", &FindFileData);
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if (!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            {
+                char filename[MAX_PATH];
+                strcpy(filename, "CLEO\\CLEO_TEXT\\");
+                strcat(filename, FindFileData.cFileName);
+                LoadFxtFile(filename);
+            }
+        } while (FindNextFile(hFind, &FindFileData));
+        FindClose(hFind);
+    }
 }
 
 void CustomText::Unload()
 {
-	CustomTextEntry *entry = pCustomTextList;
-	while(entry)
-	{
-		LOGL(LOG_PRIORITY_CUSTOM_TEXT, "Unloaded custom text \"%s\"", entry->m_key);
-		CustomTextEntry *next = entry->m_pNext;
-		delete entry;
-		entry = next;
-	}
-	pCustomTextList = 0;
+    for (auto &entry : CustomTexts)
+    {
+        LOGL(LOG_PRIORITY_CUSTOM_TEXT, "Unloaded custom text \"%s\"", entry.first.c_str());
+    }
+
+    CustomTexts.clear();
 }

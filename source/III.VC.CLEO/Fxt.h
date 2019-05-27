@@ -1,27 +1,17 @@
-#pragma once
-
-class CustomTextEntry
-{
-public:
-	wchar_t *m_pText;
-	char m_key[8];
-	CustomTextEntry *m_pNext;
-
-	CustomTextEntry(char *key, char *text);
-
-	~CustomTextEntry();
-};
+﻿#pragma once
+#include <string>
+#include <unordered_map>
 
 class CustomText
 {
 public:
-	static void Load();
+    static void Load();
 
-	static void Unload();
+    static void Unload();
 
-	static wchar_t * __fastcall GetText(int theText, int, char *key);
+    static const wchar_t * __fastcall GetText(int theText, int, const char *key);
 
-	static void LoadFxtFile(char *filepath);
+    static void LoadFxtFile(const char *filepath);
 
-	static CustomTextEntry *pCustomTextList;
+    static std::unordered_map<std::string, std::wstring> CustomTexts;
 };

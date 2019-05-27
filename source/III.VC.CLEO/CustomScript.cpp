@@ -348,3 +348,23 @@ eOpcodeResult CCustomScript::ProcessOneCommand()
     eOpcodeResult result = game.Scripts.OpcodeHandlers[id / 100](this, id);
     return result;
 }
+
+void CCustomScript::InitWrap(CCustomScript *script)
+{
+    script->Init();
+}
+
+eOpcodeResult CCustomScript::ProcessOneCommandWrap(CCustomScript *script)
+{
+    return script->ProcessOneCommand();
+}
+
+void CCustomScript::CollectWrap(CCustomScript *script, int, unsigned int *pIp, unsigned int numParams)
+{
+    script->Collect(pIp, numParams);
+}
+
+tScriptVar CCustomScript::CollectScriptNextParameterWithoutIncreasingPCWrap(CCustomScript *script, int, unsigned int ip)
+{
+    return script->CollectNextWithoutIncreasingPC(ip);
+}

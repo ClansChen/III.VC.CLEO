@@ -1,30 +1,23 @@
-#pragma once
+﻿#pragma once
 #include <Windows.h>
+#include <string>
+#include <vector>
 
-class CleoPlugin
+struct CleoPlugin
 {
-public:
+    std::string name;
+    HMODULE module;
 
-	char *name;
+    CleoPlugin(const char *pluginname, const char *librarypath);
 
-	HMODULE module;
-
-	CleoPlugin *next;
-
-	CleoPlugin(char *pluginname, char *librarypath);
-
-	~CleoPlugin();
+    ~CleoPlugin();
 };
 
 class CleoPlugins
 {
 public:
+    static void LoadPlugins();
+    static void UnloadPlugins();
 
-	static unsigned int numLoadedPlugins;
-
-	static void LoadPlugins();
-
-	static void UnloadPlugins();
-
-	static CleoPlugin *plugins;
+    static std::vector<CleoPlugin> plugins;
 };

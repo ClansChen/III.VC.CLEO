@@ -1,10 +1,6 @@
 ﻿#pragma once
 #include <vector>
 
-#ifdef CLEO_III
-#error GTA III version is unusable now.
-#endif
-
 #define LOCAL_VARS_COUNT 32
 
 enum eScriptType :unsigned short
@@ -87,16 +83,19 @@ public:
     unsigned int m_nLastPedSearchIndex;
     unsigned int m_nLastVehicleSearchIndex;
     unsigned int m_nLastObjectSearchIndex;
+
     struct {
-        unsigned int m_bFileNotFound : 1;
-        unsigned int m_bFileSeekError : 1;
-        unsigned int m_bInternalError : 1;
-        unsigned int m_bEmptyFile : 1;
-        unsigned int m_bAllocationFailed : 1;
-        unsigned int m_bEofReached : 1;
+        bool m_bFileNotFound : 1;
+        bool m_bFileSeekError : 1;
+        bool m_bInternalError : 1;
+        bool m_bEmptyFile : 1;
+        bool m_bAllocationFailed : 1;
+        bool m_bEofReached : 1;
     } m_Errors;
+
     std::vector<char> m_vecCodeData;
     unsigned int m_dwBaseIp;
+
     std::vector<ScmFunction> m_vecScmFunction;
 
     tScriptVar m_aLargeLVars[LOCAL_VARS_COUNT];
@@ -128,4 +127,12 @@ public:
     void JumpTo(int address);
 
     eOpcodeResult ProcessOneCommand();
+
+    static void __fastcall InitWrap(CCustomScript *script);
+
+    static eOpcodeResult __fastcall ProcessOneCommandWrap(CCustomScript *script);
+
+    static void __fastcall CollectWrap(CCustomScript *script, int, unsigned int *pIp, unsigned int numParams);
+
+    static tScriptVar __fastcall CollectScriptNextParameterWithoutIncreasingPCWrap(CCustomScript *script, int, unsigned int ip);
 };

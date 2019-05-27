@@ -1807,7 +1807,7 @@ eOpcodeResult CustomOpcodes::OPCODE_0ADB(CCustomScript *script)
     char *gxt = (char*)((game.Misc.stVehicleModelInfo + 0x36) + ((mi - 90) * 0x1F8));
 #endif
 
-    wchar_t *text = CustomText::GetText(game.Text.CText, 0, gxt);
+    const wchar_t *text = CustomText::GetText(game.Text.CText, 0, gxt);
     wcstombs(result, text, wcslen(text));
     result[wcslen(text)] = '\0';
     return OR_CONTINUE;
@@ -1860,7 +1860,7 @@ eOpcodeResult CustomOpcodes::OPCODE_0ADE(CCustomScript *script)
     script->Collect(2);
     char *gxt = game.Scripts.Params[0].cVar;
     char *result = game.Scripts.Params[1].cVar;
-    wchar_t *text = CustomText::GetText(game.Text.CText, 0, gxt);
+    const wchar_t *text = CustomText::GetText(game.Text.CText, 0, gxt);
     wcstombs(result, text, wcslen(text));
     result[wcslen(text)] = '\0';
     return OR_CONTINUE;
@@ -1869,14 +1869,12 @@ eOpcodeResult CustomOpcodes::OPCODE_0ADE(CCustomScript *script)
 //0ADF=2,add_dynamic_GXT_entry %1d% text %2d%
 eOpcodeResult CustomOpcodes::OPCODE_0ADF(CCustomScript *script)
 {
+    std::wstring text;
     script->Collect(2);
 
-    CustomTextEntry *entry = new CustomTextEntry(game.Scripts.Params[0].cVar, game.Scripts.Params[1].cVar);
-    if (entry)
-    {
-        entry->m_pNext = CustomText::pCustomTextList;
-        CustomText::pCustomTextList = entry;
-    }
+    text.clear();
+    std::copy_n(game.Scripts.Params[1].cVar, strlen(game.Scripts.Params[1].cVar), std::back_inserter(text));
+    CustomText::CustomTexts.insert_or_assign(game.Scripts.Params[0].cVar, text);
 
     return OR_CONTINUE;
 }
@@ -1886,45 +1884,14 @@ eOpcodeResult CustomOpcodes::OPCODE_0AE0(CCustomScript *script)
 {
     script->Collect(1);
 
-    CustomTextEntry *entry = CustomText::pCustomTextList;
-    while (entry)
-    {
-        CustomTextEntry *next = entry->m_pNext;
-        if (next)
-        {
-            if (strcmp(game.Scripts.Params[0].cVar, next->m_key) == 0)
-            {
-                if (entry->m_pNext != next->m_pNext)
-                    entry->m_pNext = next->m_pNext;
-                else
-                    entry->m_pNext = 0;
+    auto it = CustomText::CustomTexts.find(game.Scripts.Params[0].cVar);
 
-                LOGL(LOG_PRIORITY_CUSTOM_TEXT, "Unloaded custom text \"%s\"", next->m_key);
-                delete next;
-                return OR_CONTINUE;
-            }
-            else
-            {
-                if (strcmp(game.Scripts.Params[0].cVar, entry->m_key) == 0)
-                {
-                    CustomText::pCustomTextList = next;
-                    LOGL(LOG_PRIORITY_CUSTOM_TEXT, "Unloaded custom text \"%s\"", entry->m_key);
-                    delete entry;
-                    return OR_CONTINUE;
-                }
-            }
-        }
-        else
-        {
-            if (strcmp(game.Scripts.Params[0].cVar, entry->m_key) == 0)
-            {
-                LOGL(LOG_PRIORITY_CUSTOM_TEXT, "Unloaded custom text \"%s\"", entry->m_key);
-                delete entry;
-                CustomText::pCustomTextList = 0;
-                return OR_CONTINUE;
-            }
-        }
+    if (it != CustomText::CustomTexts.end())
+    {
+        LOGL(LOG_PRIORITY_CUSTOM_TEXT, "Unloaded custom text \"%s\"", it->first.c_str());
+        CustomText::CustomTexts.erase(it);
     }
+
     return OR_CONTINUE;
 }
 
